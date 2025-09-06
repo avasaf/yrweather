@@ -103,8 +103,7 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
           <SettingRow label={intl.formatMessage({ id: 'refreshButtonIcon', defaultMessage: defaultMessages.refreshButtonIcon })}>
             <ThemeColorPicker value={config.refreshButtonIconColor} onChange={(color) => { this.onConfigChange('refreshButtonIconColor', color) }} />
           </SettingRow>
-          <div style={horizontalRowStyle}>
-            <span style={labelTextStyle}>{intl.formatMessage({ id: 'padding', defaultMessage: defaultMessages.padding })}</span>
+          <SettingRow label={intl.formatMessage({ id: 'padding', defaultMessage: defaultMessages.padding })}>
             <NumericInput
               style={narrowNumericBoxStyle}
               value={config.padding}
@@ -115,7 +114,7 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
               showHandlers={false}
               suffix="px"
             />
-          </div>
+          </SettingRow>
         </SettingSection>
 
         <SettingSection title={intl.formatMessage({ id: 'logoStyling', defaultMessage: defaultMessages.logoStyling })}>
@@ -180,37 +179,30 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
           <SettingRow label={intl.formatMessage({ id: 'expandButtonIcon', defaultMessage: defaultMessages.expandButtonIcon })}>
             <ThemeColorPicker value={config.expandButtonIconColor} onChange={(color) => { this.onConfigChange('expandButtonIconColor', color) }} />
           </SettingRow>
-          <div style={horizontalRowStyle}>
-            <span style={labelTextStyle}>{intl.formatMessage({ id: 'expandButtonBorderRadius', defaultMessage: defaultMessages.expandButtonBorderRadius })}</span>
+          <SettingRow label={intl.formatMessage({ id: 'expandButtonBorderRadius', defaultMessage: defaultMessages.expandButtonBorderRadius })}>
             <NumericInput style={narrowNumericBoxStyle} value={config.expandButtonBorderRadius} onAcceptValue={(value) => { this.onConfigChange('expandButtonBorderRadius', value) }} min={0} step={1} showHandlers={false} size="sm" suffix="px" />
-          </div>
+          </SettingRow>
           <SettingRow label={intl.formatMessage({ id: 'popupBackground', defaultMessage: defaultMessages.popupBackground })}>
             <ThemeColorPicker value={config.popupBackgroundColor} onChange={(color) => { this.onConfigChange('popupBackgroundColor', color) }} />
           </SettingRow>
-          <div style={horizontalRowStyle}>
-            <span style={labelTextStyle}>{intl.formatMessage({ id: 'popupPadding', defaultMessage: defaultMessages.popupPadding })}</span>
+          <SettingRow label={intl.formatMessage({ id: 'popupPadding', defaultMessage: defaultMessages.popupPadding })}>
             <NumericInput style={narrowNumericBoxStyle} value={config.popupPadding} onAcceptValue={(value) => { this.onConfigChange('popupPadding', value) }} min={0} step={1} showHandlers={false} size="sm" suffix="px" />
-          </div>
-          <div style={horizontalRowStyle}>
-            <span style={labelTextStyle}>{intl.formatMessage({ id: 'popupBorderRadius', defaultMessage: defaultMessages.popupBorderRadius })}</span>
+          </SettingRow>
+          <SettingRow label={intl.formatMessage({ id: 'popupBorderRadius', defaultMessage: defaultMessages.popupBorderRadius })}>
             <NumericInput style={narrowNumericBoxStyle} value={config.popupBorderRadius} onAcceptValue={(value) => { this.onConfigChange('popupBorderRadius', value) }} min={0} step={1} showHandlers={false} size="sm" suffix="px" />
-          </div>
-          <div style={horizontalRowStyle}>
-            <span style={labelTextStyle}>{intl.formatMessage({ id: 'popupBoxShadowOffsetX', defaultMessage: defaultMessages.popupBoxShadowOffsetX })}</span>
+          </SettingRow>
+          <SettingRow label={intl.formatMessage({ id: 'popupBoxShadowOffsetX', defaultMessage: defaultMessages.popupBoxShadowOffsetX })}>
             <NumericInput style={narrowNumericBoxStyle} value={config.popupBoxShadowOffsetX} onAcceptValue={(value) => { this.onConfigChange('popupBoxShadowOffsetX', value) }} step={1} showHandlers={false} size="sm" suffix="px" />
-          </div>
-          <div style={horizontalRowStyle}>
-            <span style={labelTextStyle}>{intl.formatMessage({ id: 'popupBoxShadowOffsetY', defaultMessage: defaultMessages.popupBoxShadowOffsetY })}</span>
+          </SettingRow>
+          <SettingRow label={intl.formatMessage({ id: 'popupBoxShadowOffsetY', defaultMessage: defaultMessages.popupBoxShadowOffsetY })}>
             <NumericInput style={narrowNumericBoxStyle} value={config.popupBoxShadowOffsetY} onAcceptValue={(value) => { this.onConfigChange('popupBoxShadowOffsetY', value) }} step={1} showHandlers={false} size="sm" suffix="px" />
-          </div>
-          <div style={horizontalRowStyle}>
-            <span style={labelTextStyle}>{intl.formatMessage({ id: 'popupBoxShadowBlur', defaultMessage: defaultMessages.popupBoxShadowBlur })}</span>
+          </SettingRow>
+          <SettingRow label={intl.formatMessage({ id: 'popupBoxShadowBlur', defaultMessage: defaultMessages.popupBoxShadowBlur })}>
             <NumericInput style={narrowNumericBoxStyle} value={config.popupBoxShadowBlur} onAcceptValue={(value) => { this.onConfigChange('popupBoxShadowBlur', value) }} min={0} step={1} showHandlers={false} size="sm" suffix="px" />
-          </div>
-          <div style={horizontalRowStyle}>
-            <span style={labelTextStyle}>{intl.formatMessage({ id: 'popupBoxShadowSpread', defaultMessage: defaultMessages.popupBoxShadowSpread })}</span>
+          </SettingRow>
+          <SettingRow label={intl.formatMessage({ id: 'popupBoxShadowSpread', defaultMessage: defaultMessages.popupBoxShadowSpread })}>
             <NumericInput style={narrowNumericBoxStyle} value={config.popupBoxShadowSpread} onAcceptValue={(value) => { this.onConfigChange('popupBoxShadowSpread', value) }} step={1} showHandlers={false} size="sm" suffix="px" />
-          </div>
+          </SettingRow>
           <SettingRow label={intl.formatMessage({ id: 'popupBoxShadowColor', defaultMessage: defaultMessages.popupBoxShadowColor })}>
             <ThemeColorPicker value={config.popupBoxShadowColor} onChange={(color) => { this.onConfigChange('popupBoxShadowColor', color) }} />
           </SettingRow>

@@ -150,15 +150,15 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
   buildScopedCss = (config: IMConfig, scope: string) => `
     .${scope} { background-color: ${config.overallBackground}; position: relative; }
 
-    .${scope} .button-container { position: absolute; top: 8px; right: 8px; display: flex; gap: 8px; z-index: 10; }
+    .${scope} .button-container { position: absolute; top: clamp(12px,2vw,20px); right: clamp(12px,2vw,20px); display: flex; gap: clamp(6px,1vw,12px); z-index: 10; }
     .${scope} .action-button {
       cursor: pointer; border: none; line-height: 0;
       display: flex; align-items: center; justify-content: center;
-      height: 32px; width: 32px; border-radius: ${config.expandButtonBorderRadius}px;
+      height: clamp(24px,3vw,28px); width: clamp(24px,3vw,28px); border-radius: ${config.expandButtonBorderRadius}px;
     }
     .${scope} .refresh-button { background: ${config.refreshButtonBackgroundColor}; color: ${config.refreshButtonIconColor}; }
     .${scope} .refresh-button svg path { stroke: currentColor !important; fill: none !important; }
-    .${scope} .refresh-button.large { width: 40px; height: 40px; }
+    .${scope} .refresh-button.large { width: clamp(36px,4vw,44px); height: clamp(36px,4vw,44px); }
     .${scope} .expand-button { background: ${config.expandButtonBackgroundColor}; color: ${config.expandButtonIconColor}; font-size: 16px; }
 
     .${scope} .svg-image-container svg { width:100%; height:100%; display:block; background-color:${config.overallBackground} !important; }
@@ -241,6 +241,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       align-items: center;
       justify-content: center;
       overflow: hidden;
+      border-radius: inherit;
     }
   `
 
@@ -255,7 +256,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
         ? <div style={{ padding: '10px', textAlign: 'center', color: 'red' }}>
             {error}
             {config.sourceUrl && (
-              <div style={{ marginTop: 10 }}>
+              <div style={{ marginTop: 10, display: 'flex', justifyContent: 'center' }}>
                 <button
                   className="action-button refresh-button large"
                   onClick={() => this.fetchSvgFromUrl(config.sourceUrl)}
@@ -318,7 +319,11 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
               zIndex: 1000,
               padding: `${config.popupPadding}px`,
               borderRadius: `${config.popupBorderRadius}px`,
-              boxShadow: `${config.popupBoxShadowOffsetX}px ${config.popupBoxShadowOffsetY}px ${config.popupBoxShadowBlur}px ${config.popupBoxShadowSpread}px ${config.popupBoxShadowColor}`
+              boxShadow: `${config.popupBoxShadowOffsetX}px ${config.popupBoxShadowOffsetY}px ${config.popupBoxShadowBlur}px ${config.popupBoxShadowSpread}px ${config.popupBoxShadowColor}`,
+              overflow: 'hidden',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
             }}
           >
             <div className="button-container">
