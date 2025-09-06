@@ -150,7 +150,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
   buildScopedCss = (config: IMConfig, scope: string) => `
     .${scope} { background-color: ${config.overallBackground}; position: relative; }
 
-    .${scope} .button-container { position: absolute; top: clamp(12px,2vw,20px); right: clamp(12px,2vw,20px); display: flex; gap: clamp(6px,1vw,12px); z-index: 10; }
+    .${scope} .button-container { position: absolute; bottom: clamp(12px,2vw,20px); right: clamp(12px,2vw,20px); display: flex; gap: clamp(6px,1vw,12px); z-index: 10; }
     .${scope} .action-button {
       cursor: pointer; border: none; line-height: 0;
       display: flex; align-items: center; justify-content: center;
