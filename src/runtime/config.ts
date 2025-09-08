@@ -29,8 +29,24 @@ export interface Config {
   precipitationBarColor: string
   maxPrecipitationColor: string
 
-  // UI
-  refreshIconColor: string
+  // UI buttons
+  refreshButtonBackgroundColor: string
+  refreshButtonIconColor: string
+  expandButtonBackgroundColor: string
+  expandButtonIconColor: string
+  expandButtonBorderRadius: number
+
+  // Popup
+  popupBackgroundColor: string
+  popupPadding: number
+  popupBorderRadius: number
+  popupBoxShadowOffsetX: number
+  popupBoxShadowOffsetY: number
+  popupBoxShadowBlur: number
+  popupBoxShadowSpread: number
+  popupBoxShadowColor: string
+  blockPage: boolean
+  maskColor: string
 }
 
 export type IMConfig = ImmutableObject<Config>
