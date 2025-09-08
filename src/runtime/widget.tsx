@@ -173,6 +173,8 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     .${scope} .expand-button { background: ${config.expandButtonBackgroundColor}; color: ${config.expandButtonIconColor}; font-size: 16px; }
 
     .${scope} .svg-image-container svg { width:100%; height:100%; display:block; background-color:${config.overallBackground} !important; }
+    .${scope}.popup .svg-image-container { height:auto; }
+    .${scope}.popup .svg-image-container svg { height:auto; }
 
     /* Text */
     .${scope} .svg-image-container svg .location-header,
