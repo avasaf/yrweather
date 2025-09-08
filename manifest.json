@@ -5,6 +5,7 @@
     "type": "widget",
   "version": "1.0.0",
   "exbVersion": "1.18.0",
+  "Author": "Awat Safari",
   "description": "Displays a customizable meteogram chart with specific color settings.",
   "copyright": "",
   "license": "http://www.apache.org/licenses/LICENSE-2.0",
