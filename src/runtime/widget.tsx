@@ -129,6 +129,11 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       if (w && h) svg.setAttribute('viewBox', `0 0 ${w} ${h}`)
     }
 
+    // Remove fixed dimensions so SVG can scale to its container
+    svg.removeAttribute('width')
+    svg.removeAttribute('height')
+    svg.setAttribute('preserveAspectRatio', 'none')
+
     svg.querySelectorAll('style').forEach(s => s.remove())
     svg.querySelectorAll('filter').forEach(f => f.remove())
     svg.querySelectorAll('[filter]').forEach(n => n.removeAttribute('filter'))
@@ -278,7 +283,11 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
             )}
           </div>
         : (svgHtml
-            ? <div className="svg-image-container" dangerouslySetInnerHTML={{ __html: svgHtml }} />
+            ? <div
+              className="svg-image-container"
+              style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderRadius: 'inherit' }}
+              dangerouslySetInnerHTML={{ __html: svgHtml }}
+            />
             : <div style={{ padding: 10, textAlign: 'center' }}>
                 Please configure a Source URL or provide Fallback SVG Code.
               </div>)
@@ -314,7 +323,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
         {!expanded && content}
 
         {expanded && ReactDOM.createPortal(
-          <div className={scopeClass}>
+          <div className={`${scopeClass} popup`}>
             {config.blockPage && (
               <div
                 onClick={this.toggleExpand}
@@ -332,10 +341,11 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
             <div
               style={{
                 position: 'fixed',
-                top: '15%',
-                left: '15%',
-                width: '70%',
-                height: '70%',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: '70vw',
+                height: '70vh',
                 background: config.popupBackgroundColor,
                 zIndex: 2147483647,
                 padding: `${config.popupPadding}px`,
