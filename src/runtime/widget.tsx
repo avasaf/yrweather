@@ -1,6 +1,7 @@
 /** @jsx jsx */
 import { React, AllWidgetProps, jsx, css, type SerializedStyles } from 'jimu-core'
 import { Loading } from 'jimu-ui'
+import ReactDOM from 'react-dom'
 import { type IMConfig } from './config'
 
 interface State {
@@ -8,6 +9,7 @@ interface State {
   isLoading: boolean
   error: string | null
   rawSvg: string | null
+  expanded: boolean
 }
 
 export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>, State> {
@@ -15,7 +17,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
 
   constructor (props) {
     super(props)
-    this.state = { svgHtml: null, isLoading: false, error: null, rawSvg: null }
+    this.state = { svgHtml: null, isLoading: false, error: null, rawSvg: null, expanded: false }
   }
 
   componentDidMount(): void {
@@ -62,12 +64,21 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     }
   }
 
-  fetchSvgFromUrl = (url: string): void => {
-    this.setState({ isLoading: true, error: null })
-    const proxyUrl = 'https://api.allorigins.win/raw?url='
-    const finalUrl = `${proxyUrl}${encodeURIComponent(url)}`
+  toggleExpand = (): void => {
+    this.setState({ expanded: !this.state.expanded })
+  }
 
-    fetch(finalUrl)
+  fetchSvgFromUrl = (url: string, attempt = 1, proxyIndex = 0): void => {
+    if (attempt === 1) this.setState({ isLoading: true, error: null })
+    const proxies = [
+      (u: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+      (u: string) => `https://thingproxy.freeboard.io/fetch/${u}`
+    ]
+    const proxy = proxies[proxyIndex % proxies.length]
+    const noCacheUrl = url + (url.includes('?') ? '&' : '?') + 'nocache=' + Date.now()
+    const finalUrl = proxy(noCacheUrl)
+
+    fetch(finalUrl, { cache: 'no-store' })
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text() })
       .then(text => {
         const t = text.trim()
@@ -92,6 +103,10 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
         }
       })
       .catch(err => {
+        if (attempt < 5) {
+          setTimeout(() => this.fetchSvgFromUrl(url, attempt + 1, proxyIndex + 1), 1000 * attempt)
+          return
+        }
         console.error('Failed to fetch SVG:', err)
         this.setState({ error: 'Failed to load graph. Using fallback if available.', isLoading: false })
 
@@ -141,13 +156,16 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
   buildScopedCss = (config: IMConfig, scope: string) => `
     .${scope} { background-color: ${config.overallBackground}; position: relative; }
 
-    .${scope} .refresh-button {
-      position: absolute; top: 8px; right: 8px;
-      cursor: pointer; background: rgba(255,255,255,0.7);
-      border-radius: 50%; padding: 2px; z-index: 10; line-height: 0; border: none;
-      color: ${config.refreshIconColor};
+    .${scope} .button-container { position: absolute; top: clamp(24px,3vw,32px); left: 50%; transform: translate(-50%, -50%); display: flex; gap: clamp(6px,1vw,12px); z-index: 10; }
+    .${scope} .action-button {
+      cursor: pointer; border: none; line-height: 0;
+      display: flex; align-items: center; justify-content: center;
+      height: clamp(24px,3vw,28px); width: clamp(24px,3vw,28px); border-radius: ${config.expandButtonBorderRadius}px;
     }
+    .${scope} .refresh-button { background: ${config.refreshButtonBackgroundColor}; color: ${config.refreshButtonIconColor}; }
     .${scope} .refresh-button svg path { stroke: currentColor !important; fill: none !important; }
+    .${scope} .refresh-button.large { width: clamp(36px,4vw,44px); height: clamp(36px,4vw,44px); }
+    .${scope} .expand-button { background: ${config.expandButtonBackgroundColor}; color: ${config.expandButtonIconColor}; font-size: 16px; }
 
     .${scope} .svg-image-container svg { width:100%; height:100%; display:block; background-color:${config.overallBackground} !important; }
 
@@ -229,40 +247,130 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       align-items: center;
       justify-content: center;
       overflow: hidden;
+      border-radius: inherit;
     }
   `
 
   render(): React.ReactElement {
     const { config, id } = this.props
-    const { isLoading, error, svgHtml } = this.state
+    const { isLoading, error, svgHtml, expanded } = this.state
     const scopeClass = `yrw-${id}`
 
-    if (isLoading) return <Loading />
-    if (error) return <div style={{ padding: '10px', textAlign: 'center', color: 'red' }}>{error}</div>
+    const content = isLoading
+      ? <Loading />
+      : error
+        ? <div style={{ padding: '10px', textAlign: 'center', color: 'red' }}>
+            {error}
+            {config.sourceUrl && (
+              <div style={{ marginTop: 10, display: 'flex', justifyContent: 'center' }}>
+                <button
+                  className="action-button refresh-button large"
+                  onClick={() => this.fetchSvgFromUrl(config.sourceUrl)}
+                  title="Refresh graph"
+                  aria-label="Refresh graph"
+                >
+                  <svg viewBox="0 0 24 24" width="14" height="14" role="img" aria-hidden="true">
+                    <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                      d="M21 12a9 9 0 1 1-3.4-7L21 8m0-4v4h-4" />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </div>
+        : (svgHtml
+            ? <div className="svg-image-container" dangerouslySetInnerHTML={{ __html: svgHtml }} />
+            : <div style={{ padding: 10, textAlign: 'center' }}>
+                Please configure a Source URL or provide Fallback SVG Code.
+              </div>)
+
+    const showControls = this.props.config.sourceUrl && !expanded && !error
 
     return (
       <div className={scopeClass} css={this.getStyle(config)}>
         <style dangerouslySetInnerHTML={{ __html: this.buildScopedCss(config, scopeClass) }} />
 
-        {this.props.config.sourceUrl && (
-          <button
-            className="refresh-button"
-            onClick={() => this.fetchSvgFromUrl(config.sourceUrl)}
-            title="Refresh graph"
-            aria-label="Refresh graph"
-          >
-            <svg viewBox="0 0 24 24" width="14" height="14" role="img" aria-hidden="true">
-              <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                d="M21 12a9 9 0 1 1-3.4-7L21 8m0-4v4h-4" />
-            </svg>
-          </button>
+        {showControls && (
+          <div className="button-container">
+            <button
+              className="action-button refresh-button"
+              onClick={() => this.fetchSvgFromUrl(config.sourceUrl)}
+              title="Refresh graph"
+              aria-label="Refresh graph"
+            >
+              <svg viewBox="0 0 24 24" width="14" height="14" role="img" aria-hidden="true">
+                <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                  d="M21 12a9 9 0 1 1-3.4-7L21 8m0-4v4h-4" />
+              </svg>
+            </button>
+            <button
+              className="action-button expand-button"
+              onClick={this.toggleExpand}
+              title="Expand graph"
+              aria-label="Expand graph"
+            >⛶</button>
+          </div>
         )}
 
-        {svgHtml
-          ? <div className="svg-image-container" dangerouslySetInnerHTML={{ __html: svgHtml }} />
-          : <div style={{ padding: 10, textAlign: 'center' }}>
-              Please configure a Source URL or provide Fallback SVG Code.
-            </div>}
+        {!expanded && content}
+
+        {expanded && ReactDOM.createPortal(
+          <div className={scopeClass}>
+            {config.blockPage && (
+              <div
+                onClick={this.toggleExpand}
+                style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: config.maskColor,
+                  zIndex: 2147483646
+                }}
+              />
+            )}
+            <div
+              style={{
+                position: 'fixed',
+                top: '15%',
+                left: '15%',
+                width: '70%',
+                height: '70%',
+                background: config.popupBackgroundColor,
+                zIndex: 2147483647,
+                padding: `${config.popupPadding}px`,
+                borderRadius: `${config.popupBorderRadius}px`,
+                boxShadow: `${config.popupBoxShadowOffsetX}px ${config.popupBoxShadowOffsetY}px ${config.popupBoxShadowBlur}px ${config.popupBoxShadowSpread}px ${config.popupBoxShadowColor}`,
+                overflow: 'hidden',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <div className="button-container">
+                <button
+                  className="action-button refresh-button"
+                  onClick={() => this.fetchSvgFromUrl(config.sourceUrl)}
+                  title="Refresh graph"
+                  aria-label="Refresh graph"
+                >
+                  <svg viewBox="0 0 24 24" width="14" height="14" role="img" aria-hidden="true">
+                    <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                      d="M21 12a9 9 0 1 1-3.4-7L21 8m0-4v4h-4" />
+                  </svg>
+                </button>
+                <button
+                  className="action-button expand-button"
+                  onClick={this.toggleExpand}
+                  title="Close graph"
+                  aria-label="Close graph"
+                >×</button>
+              </div>
+              {content}
+            </div>
+          </div>,
+          document.body
+        )}
       </div>
     )
   }

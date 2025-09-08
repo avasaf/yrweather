@@ -25,5 +25,20 @@ export default {
     windGustLineColor: 'Wind Gust',
     precipitationBarColor: 'Precipitation',
     maxPrecipitationColor: 'Max Precipitation',
-    refreshIconColor: 'Refresh Icon'
+    refreshButtonBackground: 'Refresh Button Background',
+    refreshButtonIcon: 'Refresh Button Icon',
+    expandPopupStyling: 'Expand & Popup Styling',
+    expandButtonBackground: 'Expand Button Background',
+    expandButtonIcon: 'Expand Button Icon',
+    expandButtonBorderRadius: 'Action Button Border Radius',
+    popupBackground: 'Popup Background',
+    popupPadding: 'Popup Padding',
+    popupBorderRadius: 'Popup Border Radius',
+    popupBoxShadowOffsetX: 'Popup Shadow Offset X',
+    popupBoxShadowOffsetY: 'Popup Shadow Offset Y',
+    popupBoxShadowBlur: 'Popup Shadow Blur',
+    popupBoxShadowSpread: 'Popup Shadow Spread',
+    popupBoxShadowColor: 'Popup Shadow Color',
+    blockPage: 'Block Page',
+    maskColor: 'Mask Color'
 }
