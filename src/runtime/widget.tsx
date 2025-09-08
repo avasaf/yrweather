@@ -1,6 +1,7 @@
 /** @jsx jsx */
 import { React, AllWidgetProps, jsx, css, type SerializedStyles } from 'jimu-core'
 import { Loading } from 'jimu-ui'
+import ReactDOM from 'react-dom'
 import { type IMConfig } from './config'
 
 interface State {
@@ -67,12 +68,17 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     this.setState({ expanded: !this.state.expanded })
   }
 
-  fetchSvgFromUrl = (url: string, attempt = 1): void => {
+  fetchSvgFromUrl = (url: string, attempt = 1, proxyIndex = 0): void => {
     if (attempt === 1) this.setState({ isLoading: true, error: null })
-    const proxyUrl = 'https://api.allorigins.win/raw?url='
-    const finalUrl = `${proxyUrl}${encodeURIComponent(url)}`
+    const proxies = [
+      (u: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+      (u: string) => `https://thingproxy.freeboard.io/fetch/${u}`
+    ]
+    const proxy = proxies[proxyIndex % proxies.length]
+    const noCacheUrl = url + (url.includes('?') ? '&' : '?') + 'nocache=' + Date.now()
+    const finalUrl = proxy(noCacheUrl)
 
-    fetch(finalUrl)
+    fetch(finalUrl, { cache: 'no-store' })
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text() })
       .then(text => {
         const t = text.trim()
@@ -97,8 +103,8 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
         }
       })
       .catch(err => {
-        if (attempt < 3) {
-          setTimeout(() => this.fetchSvgFromUrl(url, attempt + 1), 1000 * attempt)
+        if (attempt < 5) {
+          setTimeout(() => this.fetchSvgFromUrl(url, attempt + 1, proxyIndex + 1), 1000 * attempt)
           return
         }
         console.error('Failed to fetch SVG:', err)
@@ -307,46 +313,63 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
 
         {!expanded && content}
 
-        {expanded && (
-          <div
-            style={{
-              position: 'fixed',
-              top: '15%',
-              left: '15%',
-              width: '70%',
-              height: '70%',
-              background: config.popupBackgroundColor,
-              zIndex: 1000,
-              padding: `${config.popupPadding}px`,
-              borderRadius: `${config.popupBorderRadius}px`,
-              boxShadow: `${config.popupBoxShadowOffsetX}px ${config.popupBoxShadowOffsetY}px ${config.popupBoxShadowBlur}px ${config.popupBoxShadowSpread}px ${config.popupBoxShadowColor}`,
-              overflow: 'hidden',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <div className="button-container">
-              <button
-                className="action-button refresh-button"
-                onClick={() => this.fetchSvgFromUrl(config.sourceUrl)}
-                title="Refresh graph"
-                aria-label="Refresh graph"
-              >
-                <svg viewBox="0 0 24 24" width="14" height="14" role="img" aria-hidden="true">
-                  <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                    d="M21 12a9 9 0 1 1-3.4-7L21 8m0-4v4h-4" />
-                </svg>
-              </button>
-              <button
-                className="action-button expand-button"
+        {expanded && ReactDOM.createPortal(
+          <div className={scopeClass}>
+            {config.blockPage && (
+              <div
                 onClick={this.toggleExpand}
-                title="Close graph"
-                aria-label="Close graph"
-              >×</button>
+                style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: config.maskColor,
+                  zIndex: 2147483646
+                }}
+              />
+            )}
+            <div
+              style={{
+                position: 'fixed',
+                top: '15%',
+                left: '15%',
+                width: '70%',
+                height: '70%',
+                background: config.popupBackgroundColor,
+                zIndex: 2147483647,
+                padding: `${config.popupPadding}px`,
+                borderRadius: `${config.popupBorderRadius}px`,
+                boxShadow: `${config.popupBoxShadowOffsetX}px ${config.popupBoxShadowOffsetY}px ${config.popupBoxShadowBlur}px ${config.popupBoxShadowSpread}px ${config.popupBoxShadowColor}`,
+                overflow: 'hidden',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <div className="button-container">
+                <button
+                  className="action-button refresh-button"
+                  onClick={() => this.fetchSvgFromUrl(config.sourceUrl)}
+                  title="Refresh graph"
+                  aria-label="Refresh graph"
+                >
+                  <svg viewBox="0 0 24 24" width="14" height="14" role="img" aria-hidden="true">
+                    <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                      d="M21 12a9 9 0 1 1-3.4-7L21 8m0-4v4h-4" />
+                  </svg>
+                </button>
+                <button
+                  className="action-button expand-button"
+                  onClick={this.toggleExpand}
+                  title="Close graph"
+                  aria-label="Close graph"
+                >×</button>
+              </div>
+              {content}
             </div>
-            {content}
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     )

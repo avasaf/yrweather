@@ -206,6 +206,14 @@ export default class Setting extends React.PureComponent<AllWidgetSettingProps<I
           <SettingRow label={intl.formatMessage({ id: 'popupBoxShadowColor', defaultMessage: defaultMessages.popupBoxShadowColor })}>
             <ThemeColorPicker value={config.popupBoxShadowColor} onChange={(color) => { this.onConfigChange('popupBoxShadowColor', color) }} />
           </SettingRow>
+          <SettingRow label={intl.formatMessage({ id: 'blockPage', defaultMessage: defaultMessages.blockPage })}>
+            <Switch checked={config.blockPage} onChange={(evt) => { this.onConfigChange('blockPage', evt.target.checked) }} />
+          </SettingRow>
+          {config.blockPage && (
+            <SettingRow label={intl.formatMessage({ id: 'maskColor', defaultMessage: defaultMessages.maskColor })}>
+              <ThemeColorPicker value={config.maskColor} onChange={(color) => { this.onConfigChange('maskColor', color) }} />
+            </SettingRow>
+          )}
         </SettingSection>
       </div>
     )

@@ -45,6 +45,8 @@ export interface Config {
   popupBoxShadowBlur: number
   popupBoxShadowSpread: number
   popupBoxShadowColor: string
+  blockPage: boolean
+  maskColor: string
 }
 
 export type IMConfig = ImmutableObject<Config>

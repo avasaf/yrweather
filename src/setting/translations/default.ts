@@ -38,5 +38,7 @@ export default {
     popupBoxShadowOffsetY: 'Popup Shadow Offset Y',
     popupBoxShadowBlur: 'Popup Shadow Blur',
     popupBoxShadowSpread: 'Popup Shadow Spread',
-    popupBoxShadowColor: 'Popup Shadow Color'
+    popupBoxShadowColor: 'Popup Shadow Color',
+    blockPage: 'Block Page',
+    maskColor: 'Mask Color'
 }

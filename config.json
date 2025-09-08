@@ -31,5 +31,7 @@
     "popupBoxShadowOffsetY": 4,
     "popupBoxShadowBlur": 10,
     "popupBoxShadowSpread": 0,
-    "popupBoxShadowColor": "#00000066"
+    "popupBoxShadowColor": "#00000066",
+    "blockPage": false,
+    "maskColor": "#00000080"
   }
