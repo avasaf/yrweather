@@ -129,6 +129,10 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       if (w && h) svg.setAttribute('viewBox', `0 0 ${w} ${h}`)
     }
 
+    // Remove fixed dimensions so SVG can scale to its container
+    svg.removeAttribute('width')
+    svg.removeAttribute('height')
+
     svg.querySelectorAll('style').forEach(s => s.remove())
     svg.querySelectorAll('filter').forEach(f => f.remove())
     svg.querySelectorAll('[filter]').forEach(n => n.removeAttribute('filter'))
@@ -168,6 +172,8 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     .${scope} .expand-button { background: ${config.expandButtonBackgroundColor}; color: ${config.expandButtonIconColor}; font-size: 16px; }
 
     .${scope} .svg-image-container svg { width:100%; height:100%; display:block; background-color:${config.overallBackground} !important; }
+    .${scope}.popup .svg-image-container { height:auto; }
+    .${scope}.popup .svg-image-container svg { height:auto; }
 
     /* Text */
     .${scope} .svg-image-container svg .location-header,
@@ -314,7 +320,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
         {!expanded && content}
 
         {expanded && ReactDOM.createPortal(
-          <div className={scopeClass}>
+          <div className={`${scopeClass} popup`}>
             {config.blockPage && (
               <div
                 onClick={this.toggleExpand}
@@ -332,10 +338,12 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
             <div
               style={{
                 position: 'fixed',
-                top: '15%',
-                left: '15%',
-                width: '70%',
-                height: '70%',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: '70vw',
+                maxHeight: '70vh',
+                height: 'auto',
                 background: config.popupBackgroundColor,
                 zIndex: 2147483647,
                 padding: `${config.popupPadding}px`,
