@@ -68,17 +68,33 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     this.setState({ expanded: !this.state.expanded })
   }
 
-  fetchSvgFromUrl = (url: string, attempt = 1, proxyIndex = 0): void => {
+  fetchSvgFromUrl = (url: string, attempt = 1): void => {
     if (attempt === 1) this.setState({ isLoading: true, error: null })
-    const proxies = [
-      (u: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-      (u: string) => `https://thingproxy.freeboard.io/fetch/${u}`
-    ]
-    const proxy = proxies[proxyIndex % proxies.length]
-    const noCacheUrl = url + (url.includes('?') ? '&' : '?') + 'nocache=' + Date.now()
-    const finalUrl = proxy(noCacheUrl)
 
-    fetch(finalUrl, { cache: 'no-store' })
+    let requestUrl = url
+    try {
+      const urlObj = new URL(url)
+      urlObj.searchParams.set('nocache', Date.now().toString())
+      requestUrl = urlObj.toString()
+    } catch (err) {
+      requestUrl = url + (url.includes('?') ? '&' : '?') + 'nocache=' + Date.now()
+    }
+
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+    if (controller) {
+      timeoutId = setTimeout(() => controller.abort(), 15000)
+    }
+
+    const fetchOptions: RequestInit = {
+      cache: 'no-store',
+      mode: 'cors',
+      credentials: 'omit',
+      headers: { Accept: 'image/svg+xml,text/html;q=0.9,*/*;q=0.8' }
+    }
+    if (controller) fetchOptions.signal = controller.signal
+
+    fetch(requestUrl, fetchOptions)
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text() })
       .then(text => {
         const t = text.trim()
@@ -103,8 +119,13 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
         }
       })
       .catch(err => {
+        if (controller) controller.abort()
+        if (timeoutId) {
+          clearTimeout(timeoutId)
+          timeoutId = null
+        }
         if (attempt < 5) {
-          setTimeout(() => this.fetchSvgFromUrl(url, attempt + 1, proxyIndex + 1), 1000 * attempt)
+          setTimeout(() => this.fetchSvgFromUrl(url, attempt + 1), 1000 * attempt)
           return
         }
         console.error('Failed to fetch SVG:', err)
@@ -114,6 +135,9 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
         if (fallback && fallback.trim().startsWith('<svg')) {
           this.processSvg(fallback)
         }
+      })
+      .finally(() => {
+        if (timeoutId) clearTimeout(timeoutId)
       })
   }
 
