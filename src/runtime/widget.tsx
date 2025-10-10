@@ -161,6 +161,9 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       .finally(() => {
         if (timeoutId) clearTimeout(timeoutId)
       })
+      .finally(() => {
+        if (timeoutId) clearTimeout(timeoutId)
+      })
   }
 
   processSvg = (svgCode: string): void => {
