@@ -4,6 +4,19 @@ import { Loading } from 'jimu-ui'
 import ReactDOM from 'react-dom'
 import { type IMConfig } from './config'
 
+interface ForecastPoint {
+  time: string
+  temperature: number
+  windSpeed: number
+  windGust: number | null
+  precipitation: number | null
+}
+
+interface ForecastPayload {
+  updatedAt: string
+  points: ForecastPoint[]
+}
+
 interface State {
   svgHtml: string
   isLoading: boolean
@@ -17,7 +30,13 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
 
   constructor (props) {
     super(props)
-    this.state = { svgHtml: null, isLoading: false, error: null, rawSvg: null, expanded: false }
+    this.state = {
+      svgHtml: null,
+      isLoading: false,
+      error: null,
+      rawSvg: null,
+      expanded: false
+    }
   }
 
   componentDidMount(): void {
@@ -68,17 +87,45 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     this.setState({ expanded: !this.state.expanded })
   }
 
-  fetchSvgFromUrl = (url: string, attempt = 1, proxyIndex = 0): void => {
-    if (attempt === 1) this.setState({ isLoading: true, error: null })
-    const proxies = [
-      (u: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-      (u: string) => `https://thingproxy.freeboard.io/fetch/${u}`
-    ]
-    const proxy = proxies[proxyIndex % proxies.length]
-    const noCacheUrl = url + (url.includes('?') ? '&' : '?') + 'nocache=' + Date.now()
-    const finalUrl = proxy(noCacheUrl)
+  fetchSvgFromUrl = (url: string, attempt = 1): void => {
+    if (attempt === 1) {
+      this.setState({ isLoading: true, error: null })
+    }
 
-    fetch(finalUrl, { cache: 'no-store' })
+    const coords = this.extractCoordinates(url)
+    if (coords) {
+      this.fetchFromForecastApi(url, coords, attempt)
+      return
+    }
+
+    this.fetchSvgDirect(url, attempt)
+  }
+
+  fetchSvgDirect = (url: string, attempt = 1): void => {
+    let requestUrl = url
+    try {
+      const urlObj = new URL(url)
+      urlObj.searchParams.set('nocache', Date.now().toString())
+      requestUrl = urlObj.toString()
+    } catch (err) {
+      requestUrl = url + (url.includes('?') ? '&' : '?') + 'nocache=' + Date.now()
+    }
+
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+    if (controller) {
+      timeoutId = setTimeout(() => controller.abort(), 15000)
+    }
+
+    const fetchOptions: RequestInit = {
+      cache: 'no-store',
+      mode: 'cors',
+      credentials: 'omit',
+      headers: { Accept: 'image/svg+xml,text/html;q=0.9,*/*;q=0.8' }
+    }
+    if (controller) fetchOptions.signal = controller.signal
+
+    fetch(requestUrl, fetchOptions)
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text() })
       .then(text => {
         const t = text.trim()
@@ -103,18 +150,288 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
         }
       })
       .catch(err => {
+        if (controller) controller.abort()
+        if (timeoutId) {
+          clearTimeout(timeoutId)
+          timeoutId = null
+        }
         if (attempt < 5) {
-          setTimeout(() => this.fetchSvgFromUrl(url, attempt + 1, proxyIndex + 1), 1000 * attempt)
+          setTimeout(() => this.fetchSvgDirect(url, attempt + 1), 1000 * attempt)
           return
         }
         console.error('Failed to fetch SVG:', err)
-        this.setState({ error: 'Failed to load graph. Using fallback if available.', isLoading: false })
 
         const fallback = this.state.rawSvg || this.props.config.svgCode
         if (fallback && fallback.trim().startsWith('<svg')) {
           this.processSvg(fallback)
+          return
         }
+
+        this.setState({
+          isLoading: false,
+          error: 'Unable to load meteogram from source.'
+        })
       })
+      .finally(() => {
+        if (timeoutId) clearTimeout(timeoutId)
+      })
+  }
+
+  extractCoordinates = (url: string): { lat: number, lon: number } | null => {
+    try {
+      const parsed = new URL(url)
+      const pathSegments = parsed.pathname.split('/').filter(Boolean)
+      const coordSegment = pathSegments.find(seg => /-?\d+\.\d+,-?\d+\.\d+/.test(seg))
+      if (!coordSegment) return null
+      const [latRaw, lonRaw] = coordSegment.split(',')
+      const lat = parseFloat(latRaw)
+      const lon = parseFloat(lonRaw)
+      if (Number.isFinite(lat) && Number.isFinite(lon)) {
+        return { lat, lon }
+      }
+      return null
+    } catch (err) {
+      return null
+    }
+  }
+
+  fetchFromForecastApi = (originalUrl: string, coords: { lat: number, lon: number }, attempt: number): void => {
+    const query = new URLSearchParams({
+      lat: coords.lat.toString(),
+      lon: coords.lon.toString()
+    })
+    const endpoint = `https://api.met.no/weatherapi/locationforecast/2.0/compact?${query.toString()}`
+
+    fetch(endpoint, {
+      cache: 'no-store',
+      credentials: 'omit',
+      headers: {
+        Accept: 'application/json'
+      }
+    })
+      .then(res => {
+        if (!res.ok) throw new Error(`Forecast HTTP ${res.status}`)
+        return res.json()
+      })
+      .then(data => {
+        const payload = this.transformForecast(data)
+        if (!payload || payload.points.length === 0) throw new Error('No forecast points available.')
+        const svg = this.generateForecastSvg(payload)
+        this.processSvg(svg)
+        this.props.onSettingChange({
+          id: this.props.id,
+          config: this.props.config.set('svgCode', svg)
+        })
+      })
+      .catch(err => {
+        console.error('Failed to build meteogram from forecast API:', err)
+        if (attempt < 5) {
+          setTimeout(() => this.fetchFromForecastApi(originalUrl, coords, attempt + 1), 1000 * attempt)
+          return
+        }
+        const fallback = this.state.rawSvg || this.props.config.svgCode
+        if (fallback && fallback.trim().startsWith('<svg')) {
+          this.processSvg(fallback)
+          return
+        }
+        this.setState({
+          isLoading: false,
+          error: 'Unable to load forecast data.'
+        })
+      })
+  }
+
+  transformForecast = (data: any): ForecastPayload | null => {
+    const updatedAt: string | undefined = data?.properties?.meta?.updated_at
+    const series: any[] = Array.isArray(data?.properties?.timeseries) ? data.properties.timeseries : []
+    if (!series.length) return null
+
+    const points: ForecastPoint[] = []
+    for (const entry of series.slice(0, 48)) {
+      const time = entry?.time
+      const instant = entry?.data?.instant?.details ?? {}
+      if (!time || typeof instant.air_temperature !== 'number' || typeof instant.wind_speed !== 'number') continue
+
+      const next1 = entry?.data?.next_1_hours?.details ?? null
+      const next6 = entry?.data?.next_6_hours?.details ?? null
+
+      points.push({
+        time,
+        temperature: instant.air_temperature,
+        windSpeed: instant.wind_speed,
+        windGust: typeof instant.wind_speed_of_gust === 'number'
+          ? instant.wind_speed_of_gust
+          : typeof next1?.wind_speed_of_gust === 'number'
+            ? next1.wind_speed_of_gust
+            : typeof next6?.wind_speed_of_gust === 'number'
+              ? next6.wind_speed_of_gust
+              : null,
+        precipitation: typeof next1?.precipitation_amount === 'number'
+          ? next1.precipitation_amount
+          : typeof next6?.precipitation_amount === 'number'
+            ? next6.precipitation_amount / 6
+            : null
+      })
+    }
+
+    if (!points.length) return null
+
+    return {
+      updatedAt: updatedAt || new Date().toISOString(),
+      points
+    }
+  }
+
+  generateForecastSvg = (forecast: ForecastPayload): string => {
+    const { config } = this.props
+    const width = 960
+    const height = 540
+    const margin = { top: 64, right: 36, bottom: 80, left: 72 }
+    const innerWidth = width - margin.left - margin.right
+    const innerHeight = height - margin.top - margin.bottom
+    const tempSection = innerHeight * 0.55
+    const precipSection = innerHeight * 0.25
+    const windSection = innerHeight * 0.2
+
+    const pts = forecast.points
+    const temperatures = pts.map(p => p.temperature)
+    const windSpeeds = pts.map(p => p.windSpeed)
+    const gusts = pts.map(p => p.windGust ?? p.windSpeed)
+    const precipValues = pts.map(p => p.precipitation ?? 0)
+
+    const tempMax = Math.max(...temperatures, 5)
+    const tempMin = Math.min(...temperatures, -5)
+    const tempRange = Math.max(tempMax - tempMin, 5)
+
+    const windMax = Math.max(...gusts, ...windSpeeds, 5)
+    const precipMax = Math.max(...precipValues, 1)
+
+    const xStep = pts.length > 1 ? innerWidth / (pts.length - 1) : 0
+
+    const xPos = (index: number) => margin.left + xStep * index
+    const tempY = (value: number) => margin.top + (tempMax - value) / tempRange * tempSection
+    const precipHeight = (value: number) => (value / precipMax) * precipSection
+    const precipBase = margin.top + tempSection + precipSection
+    const windYBase = precipBase + windSection
+    const windY = (value: number) => windYBase - (value / windMax) * windSection
+
+    const tempPath = pts
+      .map((p, i) => `${i === 0 ? 'M' : 'L'}${xPos(i).toFixed(2)},${tempY(p.temperature).toFixed(2)}`)
+      .join(' ')
+
+    const windPath = pts
+      .map((p, i) => `${i === 0 ? 'M' : 'L'}${xPos(i).toFixed(2)},${windY(p.windSpeed).toFixed(2)}`)
+      .join(' ')
+
+    const gustPath = pts
+      .map((p, i) => `${i === 0 ? 'M' : 'L'}${xPos(i).toFixed(2)},${windY((p.windGust ?? p.windSpeed)).toFixed(2)}`)
+      .join(' ')
+
+    const hoursFormatter = new Intl.DateTimeFormat(undefined, {
+      hour: 'numeric',
+      hour12: false
+    })
+    const dayFormatter = new Intl.DateTimeFormat(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric'
+    })
+
+    const updatedText = new Intl.DateTimeFormat(undefined, {
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    }).format(new Date(forecast.updatedAt))
+
+    const xLabels: { x: number, hour: string, day?: string }[] = []
+    pts.forEach((p, i) => {
+      const date = new Date(p.time)
+      const hourLabel = hoursFormatter.format(date)
+      if (i % 3 === 0) {
+        const entry: { x: number, hour: string, day?: string } = { x: xPos(i), hour: hourLabel }
+        if (date.getUTCHours() === 0) {
+          entry.day = dayFormatter.format(date)
+        }
+        xLabels.push(entry)
+      }
+    })
+
+    const tempTicks = []
+    const step = tempRange <= 10 ? 1 : tempRange <= 20 ? 2 : 5
+    for (let val = Math.ceil(tempMin / step) * step; val <= tempMax; val += step) {
+      tempTicks.push(val)
+    }
+
+    const gridLines = tempTicks.map(val => {
+      const y = tempY(val).toFixed(2)
+      return `<line x1="${margin.left}" y1="${y}" x2="${width - margin.right}" y2="${y}" stroke="${config.gridLineColor}" stroke-width="${config.gridLineWidth}" stroke-opacity="${config.gridLineOpacity}" />`
+    }).join('')
+
+    const tempTickLabels = tempTicks.map(val => {
+      const y = tempY(val).toFixed(2)
+      return `<text x="${margin.left - 10}" y="${y}" text-anchor="end" dominant-baseline="middle" font-size="12" fill="${config.secondaryTextColor}">${val.toFixed(0)}°</text>`
+    }).join('')
+
+    const precipBars = pts.map((p, i) => {
+      const value = p.precipitation ?? 0
+      if (value <= 0) return ''
+      const barHeight = Math.max(2, precipHeight(value))
+      const x = xPos(i) - Math.max(2, xStep * 0.35)
+      const barWidth = Math.max(4, xStep * 0.7)
+      const y = precipBase - barHeight
+      return `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${barWidth.toFixed(2)}" height="${barHeight.toFixed(2)}" fill="${config.precipitationBarColor}" />`
+    }).join('')
+
+    const xLabelElements = xLabels.map(label => {
+      const y = height - margin.bottom + 20
+      const dayText = label.day ? `<text x="${label.x.toFixed(2)}" y="${y + 18}" text-anchor="middle" font-size="12" fill="${config.secondaryTextColor}">${label.day}</text>` : ''
+      return `
+        <g>
+          <text x="${label.x.toFixed(2)}" y="${y}" text-anchor="middle" font-size="12" fill="${config.mainTextColor}">${label.hour}</text>
+          ${dayText}
+        </g>
+      `
+    }).join('')
+
+    const windTicks = []
+    const windStep = windMax <= 10 ? 2 : windMax <= 20 ? 5 : 10
+    for (let val = 0; val <= windMax; val += windStep) {
+      const y = windY(val).toFixed(2)
+      windTicks.push(`<line x1="${margin.left}" y1="${y}" x2="${width - margin.right}" y2="${y}" stroke="${config.gridLineColor}" stroke-width="0.5" stroke-opacity="${config.gridLineOpacity * 0.5}" />`)
+      windTicks.push(`<text x="${width - margin.right + 8}" y="${y}" font-size="11" fill="${config.secondaryTextColor}" dominant-baseline="middle">${val.toFixed(0)} m/s</text>`)
+    }
+
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="meteogramTitle meteogramDesc">
+  <title id="meteogramTitle">YR meteogram</title>
+  <desc id="meteogramDesc">Temperature, precipitation and wind forecast derived from api.met.no</desc>
+  <rect x="0" y="0" width="${width}" height="${height}" fill="${config.overallBackground}" />
+  <g font-family="sans-serif">
+    <text x="${margin.left}" y="32" font-size="20" fill="${config.mainTextColor}">Weather forecast</text>
+    <text x="${margin.left}" y="52" font-size="12" fill="${config.secondaryTextColor}">Updated ${updatedText}</text>
+  </g>
+  <g>
+    ${gridLines}
+    ${tempTickLabels}
+    <path d="${tempPath}" fill="none" stroke="${config.temperatureLineColor}" stroke-width="2.5" />
+  </g>
+  <g>
+    ${precipBars}
+  </g>
+  <g>
+    <path d="${windPath}" fill="none" stroke="${config.windLineColor}" stroke-width="2" />
+    <path d="${gustPath}" fill="none" stroke="${config.windGustLineColor}" stroke-width="2" stroke-dasharray="6 4" />
+    ${windTicks.join('')}
+  </g>
+  <g>
+    ${xLabelElements}
+    <line x1="${margin.left}" y1="${height - margin.bottom}" x2="${width - margin.right}" y2="${height - margin.bottom}" stroke="${config.gridLineColor}" stroke-width="1" stroke-opacity="${config.gridLineOpacity}" />
+  </g>
+  <g font-size="12">
+    <text x="${margin.left}" y="${margin.top - 20}" fill="${config.mainTextColor}">Temperature (°C)</text>
+    <text x="${margin.left}" y="${precipBase - precipSection - 8}" fill="${config.mainTextColor}">Precipitation (mm)</text>
+    <text x="${margin.left}" y="${windYBase - windSection - 8}" fill="${config.mainTextColor}">Wind speed (m/s)</text>
+  </g>
+</svg>`
   }
 
   processSvg = (svgCode: string): void => {
@@ -156,8 +473,12 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       const html = fo.querySelector('*') as HTMLElement | null
       if (html) html.setAttribute('style', `${html.getAttribute('style') || ''};background:${config.overallBackground} !important;`)
     })
-
-    this.setState({ svgHtml: svg.outerHTML, isLoading: false, error: null, rawSvg: svgCode })
+    this.setState({
+      svgHtml: svg.outerHTML,
+      isLoading: false,
+      error: null,
+      rawSvg: svgCode
+    })
   }
 
   buildScopedCss = (config: IMConfig, scope: string) => `
@@ -290,15 +611,15 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
               </div>
             )}
           </div>
-        : (svgHtml
-            ? <div
-              className="svg-image-container"
-              style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderRadius: 'inherit' }}
-              dangerouslySetInnerHTML={{ __html: svgHtml }}
-            />
-            : <div style={{ padding: 10, textAlign: 'center' }}>
-                Please configure a Source URL or provide Fallback SVG Code.
-              </div>)
+        : svgHtml
+          ? <div
+            className="svg-image-container"
+            style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderRadius: 'inherit' }}
+            dangerouslySetInnerHTML={{ __html: svgHtml }}
+          />
+          : <div style={{ padding: 10, textAlign: 'center' }}>
+              Please configure a Source URL or provide Fallback SVG Code.
+            </div>
 
     const showControls = this.props.config.sourceUrl && !expanded && !error
 
