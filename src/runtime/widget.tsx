@@ -23,6 +23,8 @@ interface State {
   error: string | null
   rawSvg: string | null
   expanded: boolean
+  displayMode: DisplayMode
+  externalUrl: string | null
 }
 
 export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>, State> {
@@ -71,7 +73,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     } else if (config.svgCode && !config.svgCode.trim().startsWith('<!--')) {
       this.processSvg(config.svgCode)
     } else {
-      this.setState({ svgHtml: null, error: null, isLoading: false, rawSvg: null })
+      this.setState({ svgHtml: null, error: null, isLoading: false, rawSvg: null, displayMode: 'inline', externalUrl: null })
     }
   }
 
@@ -587,7 +589,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
 
   render(): React.ReactElement {
     const { config, id } = this.props
-    const { isLoading, error, svgHtml, expanded } = this.state
+    const { isLoading, error, svgHtml, expanded, displayMode, externalUrl } = this.state
     const scopeClass = `yrw-${id}`
 
     const content = isLoading
