@@ -4,12 +4,16 @@ import { Loading } from 'jimu-ui'
 import ReactDOM from 'react-dom'
 import { type IMConfig } from './config'
 
+type DisplayMode = 'inline' | 'external'
+
 interface State {
   svgHtml: string
   isLoading: boolean
   error: string | null
   rawSvg: string | null
   expanded: boolean
+  displayMode: DisplayMode
+  externalUrl: string | null
 }
 
 export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>, State> {
@@ -17,7 +21,15 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
 
   constructor (props) {
     super(props)
-    this.state = { svgHtml: null, isLoading: false, error: null, rawSvg: null, expanded: false }
+    this.state = {
+      svgHtml: null,
+      isLoading: false,
+      error: null,
+      rawSvg: null,
+      expanded: false,
+      displayMode: 'inline',
+      externalUrl: null
+    }
   }
 
   componentDidMount(): void {
@@ -52,7 +64,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
     } else if (config.svgCode && !config.svgCode.trim().startsWith('<!--')) {
       this.processSvg(config.svgCode)
     } else {
-      this.setState({ svgHtml: null, error: null, isLoading: false, rawSvg: null })
+      this.setState({ svgHtml: null, error: null, isLoading: false, rawSvg: null, displayMode: 'inline', externalUrl: null })
     }
   }
 
@@ -69,7 +81,9 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
   }
 
   fetchSvgFromUrl = (url: string, attempt = 1): void => {
-    if (attempt === 1) this.setState({ isLoading: true, error: null })
+    if (attempt === 1) {
+      this.setState({ isLoading: true, error: null, displayMode: 'inline', externalUrl: null })
+    }
 
     let requestUrl = url
     try {
@@ -129,12 +143,23 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
           return
         }
         console.error('Failed to fetch SVG:', err)
-        this.setState({ error: 'Failed to load graph. Using fallback if available.', isLoading: false })
 
         const fallback = this.state.rawSvg || this.props.config.svgCode
         if (fallback && fallback.trim().startsWith('<svg')) {
           this.processSvg(fallback)
+          return
         }
+
+        const externalUrl = requestUrl
+        this.setState({
+          isLoading: false,
+          error: null,
+          displayMode: 'external',
+          externalUrl
+        })
+      })
+      .finally(() => {
+        if (timeoutId) clearTimeout(timeoutId)
       })
       .finally(() => {
         if (timeoutId) clearTimeout(timeoutId)
@@ -180,8 +205,14 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
       const html = fo.querySelector('*') as HTMLElement | null
       if (html) html.setAttribute('style', `${html.getAttribute('style') || ''};background:${config.overallBackground} !important;`)
     })
-
-    this.setState({ svgHtml: svg.outerHTML, isLoading: false, error: null, rawSvg: svgCode })
+    this.setState({
+      svgHtml: svg.outerHTML,
+      isLoading: false,
+      error: null,
+      rawSvg: svgCode,
+      displayMode: 'inline',
+      externalUrl: null
+    })
   }
 
   buildScopedCss = (config: IMConfig, scope: string) => `
@@ -290,7 +321,7 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
 
   render(): React.ReactElement {
     const { config, id } = this.props
-    const { isLoading, error, svgHtml, expanded } = this.state
+    const { isLoading, error, svgHtml, expanded, displayMode, externalUrl } = this.state
     const scopeClass = `yrw-${id}`
 
     const content = isLoading
@@ -314,12 +345,26 @@ export default class Widget extends React.PureComponent<AllWidgetProps<IMConfig>
               </div>
             )}
           </div>
-        : (svgHtml
-            ? <div
-              className="svg-image-container"
-              style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderRadius: 'inherit' }}
-              dangerouslySetInnerHTML={{ __html: svgHtml }}
-            />
+        : (displayMode === 'external' && externalUrl
+            ? <div className="svg-image-container" style={{ width: '100%', height: '100%' }}>
+              <iframe
+                src={externalUrl}
+                title="YR meteogram"
+                loading="lazy"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  border: 'none',
+                  background: config.overallBackground
+                }}
+              />
+            </div>
+            : svgHtml
+              ? <div
+                className="svg-image-container"
+                style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderRadius: 'inherit' }}
+                dangerouslySetInnerHTML={{ __html: svgHtml }}
+              />
             : <div style={{ padding: 10, textAlign: 'center' }}>
                 Please configure a Source URL or provide Fallback SVG Code.
               </div>)
